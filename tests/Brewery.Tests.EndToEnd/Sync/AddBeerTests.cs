@@ -1,9 +1,11 @@
 ﻿using System.Net;
+using System.Net.Http.Headers;
 using System.Text;
 using Brewery.Application.Commands;
 using Brewery.Domain.Entities;
 using Brewery.Tests.Shared.Factories;
 using Brewery.Tests.Shared.Fixtures;
+using Brewery.Tests.Shared.Helpers;
 using Microsoft.EntityFrameworkCore;
 using Newtonsoft.Json;
 using Shouldly;
@@ -16,9 +18,24 @@ public class AddBeerTests : IClassFixture<BreweryAppFactory>, IClassFixture<Brew
     private Task<HttpResponseMessage> Act() => _httpClient.PostAsync("Beer", GetPayload(_command));
 
     [Fact]
-    public async Task add_beer_endpoint_should_return_status_code_created_at_action()
+    public async Task add_beer_endpoint_without_authorization_should_return_status_code_unauthorized()
     {
         await SeedDatabase();
+        // var userId = Guid.NewGuid();
+        // Authenticate(userId);
+
+        var response = await Act();
+
+        response.ShouldNotBeNull();
+        response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+    }
+    
+    [Fact]
+    public async Task add_beer_endpoint_should_return_status_code_created()
+    {
+        await SeedDatabase();
+        var userId = Guid.NewGuid();
+        Authenticate(userId);
 
         var response = await Act();
 
@@ -30,6 +47,8 @@ public class AddBeerTests : IClassFixture<BreweryAppFactory>, IClassFixture<Brew
     public async Task add_beer_endpoint_should_return_location_header_with_correct_beer_id()
     {
         await SeedDatabase();
+        var userId = Guid.NewGuid();
+        Authenticate(userId);
 
         var response = await Act();
         
@@ -44,6 +63,8 @@ public class AddBeerTests : IClassFixture<BreweryAppFactory>, IClassFixture<Brew
     public async Task add_beer_endpoint_should_add_beer_entity_with_given_id_to_database()
     {
         await SeedDatabase();
+        var userId = Guid.NewGuid();
+        Authenticate(userId);
         
         var response = await Act();
 
@@ -79,5 +100,11 @@ public class AddBeerTests : IClassFixture<BreweryAppFactory>, IClassFixture<Brew
         var brewer = Brewer.Create(_brewerId, "brewer 1");
         await _breweryDbFixture.BreweryDbContext.Brewers.AddAsync(brewer);
         await _breweryDbFixture.BreweryDbContext.SaveChangesAsync();
+    }
+
+    private void Authenticate(Guid userId)
+    {
+        var jwt = AuthHelper.GenerateToken(userId.ToString());
+        _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", jwt);
     }
 }
